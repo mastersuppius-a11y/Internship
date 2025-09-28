@@ -84,9 +84,14 @@ export function Navigation() {
               </Button>
             </div>
           ) : (
-            <Button variant="hero" size="sm" asChild>
-              <Link to="/auth">Sign In</Link>
-            </Button>
+            <div className="flex items-center space-x-4">
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/internships">Browse Internships</Link>
+              </Button>
+              <Button variant="hero" size="sm" asChild>
+                <Link to="/auth">Sign In</Link>
+              </Button>
+            </div>
           )}
         </div>
 
@@ -138,11 +143,18 @@ export function Navigation() {
                     </Button>
                   </div>
                 ) : (
-                  <Button variant="hero" className="mt-4" asChild>
-                    <Link to="/auth" onClick={() => setIsOpen(false)}>
-                      Sign In
-                    </Link>
-                  </Button>
+                  <div className="space-y-2 mt-4">
+                    <Button variant="outline" className="w-full" asChild>
+                      <Link to="/internships" onClick={() => setIsOpen(false)}>
+                        Browse Internships
+                      </Link>
+                    </Button>
+                    <Button variant="hero" className="w-full" asChild>
+                      <Link to="/auth" onClick={() => setIsOpen(false)}>
+                        Sign In
+                      </Link>
+                    </Button>
+                  </div>
                 )}
               </div>
             </SheetContent>

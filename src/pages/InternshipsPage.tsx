@@ -7,6 +7,10 @@ import { Search, Filter, Sparkles } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
 import { InternshipCard } from "@/components/InternshipCard";
 import { useInternships } from "@/hooks/useInternships";
+import { AIQuestionnaire, QuestionnaireAnswers } from "@/components/AIQuestionnaire";
+import { AIRecommendations } from "@/components/AIRecommendations";
+import { getAIRecommendations, InternshipRecommendation } from "@/services/geminiService";
+import { useToast } from "@/hooks/use-toast";
 
 const sectors = ["All Sectors", "Technology", "Finance", "Marketing", "Design", "Healthcare", "Education", "Consulting"];
 
@@ -15,8 +19,12 @@ export default function InternshipsPage() {
   const [location, setLocation] = useState("");
   const [sector, setSector] = useState("All Sectors");
   const [showRecommendations, setShowRecommendations] = useState(false);
+  const [showQuestionnaire, setShowQuestionnaire] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<InternshipRecommendation[]>([]);
+  const [loadingAI, setLoadingAI] = useState(false);
   
   const { internships, loading, fetchInternships, getRecommendations } = useInternships();
+  const { toast } = useToast();
 
   const handleSearch = () => {
     const filters: any = {};
@@ -29,18 +37,42 @@ export default function InternshipsPage() {
   };
 
   const handleGetRecommendations = () => {
-    if (!skills.trim()) {
-      alert("Please enter your skills to get personalized recommendations");
-      return;
+    setShowQuestionnaire(true);
+  };
+
+  const handleQuestionnaireComplete = async (answers: QuestionnaireAnswers) => {
+    setShowQuestionnaire(false);
+    setLoadingAI(true);
+    
+    try {
+      const recommendations = await getAIRecommendations(answers, internships);
+      setAiRecommendations(recommendations);
+      setShowRecommendations(true);
+      
+      toast({
+        title: "AI Recommendations Ready!",
+        description: `Found ${recommendations.length} personalized internship recommendations for you.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate AI recommendations. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingAI(false);
     }
-    setShowRecommendations(true);
   };
 
   const recommendedInternships = showRecommendations 
-    ? getRecommendations({ skills, location, sector: sector !== "All Sectors" ? sector : undefined })
+    ? aiRecommendations.length > 0 
+      ? aiRecommendations 
+      : getRecommendations({ skills, location, sector: sector !== "All Sectors" ? sector : undefined })
     : [];
 
-  const displayedInternships = showRecommendations ? recommendedInternships : internships;
+  const displayedInternships = showRecommendations 
+    ? (aiRecommendations.length > 0 ? [] : recommendedInternships)
+    : internships;
 
   const SkeletonCard = () => (
     <Card className="animate-pulse">
@@ -127,11 +159,11 @@ export default function InternshipsPage() {
               <Button 
                 onClick={handleGetRecommendations} 
                 variant="hero"
-                disabled={loading}
+                disabled={loading || loadingAI}
                 className="flex-1 sm:flex-none"
               >
                 <Sparkles className="mr-2 h-4 w-4" />
-                Get AI Recommendations
+                {loadingAI ? "Analyzing..." : "Get AI Recommendations"}
               </Button>
               <Button 
                 onClick={handleSearch} 
@@ -149,14 +181,18 @@ export default function InternshipsPage() {
         {/* Results Section */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-semibold text-foreground">
-            {loading ? "Searching..." : 
-             showRecommendations ? `${recommendedInternships.length} AI Recommendations` :
+            {loading || loadingAI ? "Searching..." : 
+             showRecommendations && aiRecommendations.length > 0 ? `${aiRecommendations.length} AI Recommendations` :
+             showRecommendations ? `${recommendedInternships.length} Quick Recommendations` :
              `${internships.length} Internships Found`}
           </h2>
           {showRecommendations && (
             <Button
               variant="ghost"
-              onClick={() => setShowRecommendations(false)}
+              onClick={() => {
+                setShowRecommendations(false);
+                setAiRecommendations([]);
+              }}
               className="text-primary"
             >
               View All Internships
@@ -165,12 +201,20 @@ export default function InternshipsPage() {
         </div>
 
         {/* Internship Cards */}
-        {loading ? (
+        {loading || loadingAI ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
               <SkeletonCard key={i} />
             ))}
           </div>
+        ) : showRecommendations && aiRecommendations.length > 0 ? (
+          <AIRecommendations 
+            recommendations={aiRecommendations}
+            onClose={() => {
+              setShowRecommendations(false);
+              setAiRecommendations([]);
+            }}
+          />
         ) : displayedInternships.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
@@ -191,6 +235,7 @@ export default function InternshipsPage() {
                 setLocation("");
                 setSector("All Sectors");
                 setShowRecommendations(false);
+                setAiRecommendations([]);
                 fetchInternships();
               }}
               variant="outline"
@@ -209,6 +254,14 @@ export default function InternshipsPage() {
               />
             ))}
           </div>
+        )}
+
+        {/* AI Questionnaire Modal */}
+        {showQuestionnaire && (
+          <AIQuestionnaire
+            onComplete={handleQuestionnaireComplete}
+            onClose={() => setShowQuestionnaire(false)}
+          />
         )}
       </main>
     </div>
